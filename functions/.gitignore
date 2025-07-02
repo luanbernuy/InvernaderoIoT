@@ -1,0 +1,10 @@
+# Claves privadas y archivos de configuración
+.env
+serviceAccountKey.json
+
+# Dependencias
+node_modules/
+
+# Archivos generados
+*.log
+coverage/

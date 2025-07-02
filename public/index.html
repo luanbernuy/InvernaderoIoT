@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🌱 Invernadero IoT</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f0f0; margin: 0; padding: 0; text-align: center; }
+    nav { background-color: #1e272e; padding: 15px; display: flex; justify-content: center; gap: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    nav button { background-color: #2d3436; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 6px; cursor: pointer; transition: background 0.3s; }
+    nav button:hover { background-color: #636e72; }
+    .container { max-width: 1000px; margin: auto; padding: 20px; }
+    .section { margin: 20px 0; padding: 15px; border-radius: 10px; color: #2d3436; display: none; background: #ffffff; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+    .active { display: block !important; }
+    .inicio { background-color: #dfe6e9; }
+    .clima, .rangos, .modo, .manual, .sensores-sub { padding: 20px; margin-bottom: 20px; border-radius: 8px; }
+    .clima { background-color: #dfe6e9; }
+    .rangos { background-color: #fab1a0; }
+    .modo { background-color: #a29bfe; }
+    .manual { background-color: #81ecec; }
+    .sensores-sub { background-color: #ffeaa7; }
+    .graficos { background-color: #f8f9fa; }
+    .historial { background-color: #ffeaa7; }
+    .flex { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+    .half { flex: 1 1 350px; }
+    button, input[type="number"] { padding: 8px 14px; margin: 6px 4px; border-radius: 5px; font-size: 15px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    table, th, td { border: 1px solid #ccc; }
+    th, td { padding: 8px; }
+    canvas { max-width: 100%; margin-top: 10px; }
+    .estado-actuadores {
+      background-color: #fc9636;
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .estado-actuadores h3 {
+      margin-bottom: 10px;
+    }
+    .estado-actuadores span {
+      font-weight: bold;
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <nav>
+    <button onclick="showPage('inicio')">🏠 Inicio</button>
+    <button onclick="showPage('sensores')">🌡️ Sensores</button>
+    <button onclick="showPage('graficos')">📊 Gráficos</button>
+    <button onclick="showPage('historial')">📋 Historial</button>
+  </nav>
+  <div class="container">
+    <div id="inicio" class="section active inicio">
+      <h2>🌱 Bienvenido al sistema Invernadero IoT</h2>
+      <p>Este sistema permite monitorear y controlar las condiciones ambientales de un invernadero en tiempo real. Utiliza sensores de temperatura, humedad del aire y del suelo, luz, CO₂ y presión para optimizar el ambiente de cultivo. Además, permite el control manual o automático de dispositivos como ventiladores y bombas de riego para mantener condiciones óptimas.</p>
+    </div>
+
+    <div id="sensores" class="section">
+      <div class="flex">
+        <div class="clima half">
+          <h3>🌡️ Temp: <span id="temp">--</span> °C</h3>
+          <h3>💧 Humedad Aire: <span id="hum">--</span> %</h3>
+          <h3>🌾 Humedad Suelo: <span id="suelo">--</span> %</h3>
+        </div>
+        <div class="rangos half">
+          <h3>🌡️ Rango Temp (0-100 °C):</h3>
+          <input type="number" id="tempMin" placeholder="Temp min (0-100)" min="0" max="100" step="any">
+          <input type="number" id="tempMax" placeholder="Temp max (0-100)" min="0" max="100" step="any"> °C <br>
+          <h3>🌾 Rango Hum Suelo (0-100 %):</h3>
+          <input type="number" id="sueloMin" placeholder="Humedad min (0-100)" min="0" max="100" step="any">
+          <input type="number" id="sueloMax" placeholder="Humedad max (0-100)" min="0" max="100" step="any"> %  <br>
+          <button onclick="guardarRangos()">Guardar Rangos</button>
+          <p><b>Actual:</b> <span id="rango_temp">--</span> °C | <span id="rango_suelo">--</span> %</p>
+          <p id="mensajeConfirmacion" style="color: green;"></p>
+        </div>
+      </div>
+      <div class="sensores-sub">
+        <h3>💨 CO₂: <span id="co2">--</span> ppm</h3>
+        <h3>☀️ Luz: <span id="luz">--</span> lux</h3>
+        <h3>💧 Presión: <span id="presion">--</span> hPa</h3>
+      </div>
+      <div class="flex">
+        <div class="modo half">
+          <h3>⚙️ Modo: <span id="modo">--</span></h3>
+          <button onclick="setModo(true)">Modo Automático</button>
+          <button onclick="setModo(false)">Modo Manual</button>
+          <div class="estado-actuadores">
+            <h3>📟 Estado de los Actuadores</h3>
+            <p>💧 Bomba: <span id="estadoBomba">--</span></p>
+            <p>💨 Ventilador: <span id="estadoVentilador">--</span></p>
+          </div>
+        </div>
+        <div class="manual half">
+          <h3>🚧 Control Manual:</h3>
+          <button id="btnBombaOn" onclick="control('bomba_manual', true)">🟢 Bomba</button>
+          <button id="btnBombaOff" onclick="control('bomba_manual', false)">🔴 Bomba</button><br>
+          <button id="btnVentiladorOn" onclick="control('ventilador_manual', true)">🟢 Ventilador</button>
+          <button id="btnVentiladorOff" onclick="control('ventilador_manual', false)">🔴 Ventilador</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="graficos" class="section graficos">
+      <h3>📊 Gráficos de Sensores</h3>
+      <canvas id="chartTemp"></canvas>
+      <canvas id="chartHumedad"></canvas>
+      <canvas id="chartOtros"></canvas>
+    </div>
+
+    <div id="historial" class="section historial">
+      <h3>📋 Historial de Lecturas</h3>
+      <table>
+        <thead>
+          <tr><th>Fecha</th><th>Temp</th><th>H. Aire</th><th>H. Suelo</th><th>CO2</th><th>Luz</th><th>Presión</th></tr>
+        </thead>
+        <tbody id="tablaHistorial"></tbody>
+      </table>
+    </div>
+  </div>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDUGOqdWFNObEFUsTY3lOeFWAT8qBzbd7A",
+      authDomain: "invernaderoiot-91043.firebaseapp.com",
+      databaseURL: "https://invernaderoiot-91043-default-rtdb.firebaseio.com",
+      projectId: "invernaderoiot-91043",
+      storageBucket: "invernaderoiot-91043.appspot.com",
+      messagingSenderId: "658490021029",
+      appId: "1:658490021029:web:7a088e0b0feb667bdfe94c"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function showPage(id) {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    db.ref("datos").on("value", snap => {
+      const d = snap.val();
+      document.getElementById("temp").innerText = d.temperatura ?? "--";
+      document.getElementById("hum").innerText = d.humedad_aire ?? "--";
+      document.getElementById("suelo").innerText = d.humedad_suelo ?? "--";
+      document.getElementById("co2").innerText = d.co2 ?? "--";
+      document.getElementById("luz").innerText = d.luz ?? "--";
+      document.getElementById("presion").innerText = d.presion ?? "--";
+      document.getElementById("modo").innerText = d.modo_automatico ? "Automático" : "Manual";
+    });
+
+    db.ref("valores_ideales").on("value", snap => {
+      const v = snap.val();
+      document.getElementById("rango_temp").innerText = `${v.temp_min ?? '--'} - ${v.temp_max ?? '--'}`;
+      document.getElementById("rango_suelo").innerText = `${v.suelo_min ?? '--'} - ${v.suelo_max ?? '--'}`;
+    });
+
+    let datosActuales = {};
+  let valoresIdeales = {};
+  let estadoManual = {
+    bomba: "--",
+    ventilador: "--"
+  };
+
+  db.ref("datos").on("value", snap => {
+    datosActuales = snap.val();
+    actualizarEstadoActuadores();
+  });
+
+  db.ref("valores_ideales").on("value", snap => {
+    valoresIdeales = snap.val();
+    actualizarEstadoActuadores();
+  });
+
+  db.ref("controles").on("value", snap => {
+    const controles = snap.val();
+    estadoManual.bomba = controles.bomba_manual ? "Encendida" : "Apagada";
+    estadoManual.ventilador = controles.ventilador_manual ? "Encendido" : "Apagado";
+    if (typeof controles.modo_automatico !== "undefined") {
+      datosActuales.modo_automatico = controles.modo_automatico;
+      actualizarEstadoActuadores();
+    }
+  });
+
+  function actualizarEstadoActuadores() {
+    if (!datosActuales || !valoresIdeales) return;
+
+    const modoAuto = datosActuales.modo_automatico;
+    let estadoBomba = "--";
+    let estadoVentilador = "--";
+
+    if (modoAuto) {
+      const humedadSuelo = parseFloat(datosActuales.humedad_suelo);
+      const temperatura = parseFloat(datosActuales.temperatura);
+
+      if (isNaN(humedadSuelo) || isNaN(temperatura)) return;
+
+      estadoBomba = (humedadSuelo < valoresIdeales.suelo_min) ? "Encendida" : "Apagada";
+      estadoVentilador = (temperatura > valoresIdeales.temp_max) ? "Encendido" : "Apagado";
+
+    } else {
+      estadoBomba = estadoManual.bomba;
+      estadoVentilador = estadoManual.ventilador;
+    }
+
+    const bombaIcono = estadoBomba === "Encendida" ? "🟢" : "🔴";
+    const ventiladorIcono = estadoVentilador === "Encendido" ? "🟢" : "🔴";
+
+    document.getElementById("estadoBomba").innerText = `${bombaIcono} ${estadoBomba}`;
+    document.getElementById("estadoVentilador").innerText = `${ventiladorIcono} ${estadoVentilador}`;
+
+  }
+
+    function setModo(activo) {
+      db.ref("/controles/modo_automatico").set(activo);
+    }
+
+    function control(param, estado) {
+      db.ref(`/controles/${param}`).set(estado);
+    }
+
+function guardarRangos() {
+  const tempMinInput = document.getElementById("tempMin");
+  const tempMaxInput = document.getElementById("tempMax");
+  const sueloMinInput = document.getElementById("sueloMin");
+  const sueloMaxInput = document.getElementById("sueloMax");
+
+  const temp_min = tempMinInput.value.trim();
+  const temp_max = tempMaxInput.value.trim();
+  const suelo_min = sueloMinInput.value.trim();
+  const suelo_max = sueloMaxInput.value.trim();
+
+  const mensaje = document.getElementById("mensajeConfirmacion");
+  mensaje.innerText = "";
+  mensaje.style.color = "red";
+
+  let actualizaciones = {};
+
+  // Leer los valores actuales desde Firebase
+  db.ref("valores_ideales").once("value")
+    .then(snapshot => {
+      const valoresActuales = snapshot.val() || {};
+
+      // Verificamos y validamos cada campo
+      const tMin = temp_min !== "" ? parseFloat(temp_min) : undefined;
+      const tMax = temp_max !== "" ? parseFloat(temp_max) : undefined;
+      const sMin = suelo_min !== "" ? parseFloat(suelo_min) : undefined;
+      const sMax = suelo_max !== "" ? parseFloat(suelo_max) : undefined;
+
+      if (tMin !== undefined) {
+        if (isNaN(tMin) || tMin < 0 || tMin > 100) {
+          mensaje.innerText = "❌ Temp min debe ser un número entre 0 y 100.";
+          return;
+        }
+        actualizaciones.temp_min = tMin;
+      }
+
+      if (tMax !== undefined) {
+        if (isNaN(tMax) || tMax < 0 || tMax > 100) {
+          mensaje.innerText = "❌ Temp max debe ser un número entre 0 y 100.";
+          return;
+        }
+        actualizaciones.temp_max = tMax;
+      }
+
+      if (sMin !== undefined) {
+        if (isNaN(sMin) || sMin < 0 || sMin > 100) {
+          mensaje.innerText = "❌ Humedad min debe ser un número entre 0 y 100.";
+          return;
+        }
+        actualizaciones.suelo_min = sMin;
+      }
+
+      if (sMax !== undefined) {
+        if (isNaN(sMax) || sMax < 0 || sMax > 100) {
+          mensaje.innerText = "❌ Humedad max debe ser un número entre 0 y 100.";
+          return;
+        }
+        actualizaciones.suelo_max = sMax;
+      }
+
+      // Validaciones cruzadas (incluso si solo se ingresa uno)
+      const tempMinFinal = tMin !== undefined ? tMin : valoresActuales.temp_min;
+      const tempMaxFinal = tMax !== undefined ? tMax : valoresActuales.temp_max;
+
+      if (tempMinFinal !== undefined && tempMaxFinal !== undefined && tempMinFinal > tempMaxFinal) {
+        mensaje.innerText = "❌ Temp min no puede ser mayor que temp max.";
+        return;
+      }
+
+      const sueloMinFinal = sMin !== undefined ? sMin : valoresActuales.suelo_min;
+      const sueloMaxFinal = sMax !== undefined ? sMax : valoresActuales.suelo_max;
+
+      if (sueloMinFinal !== undefined && sueloMaxFinal !== undefined && sueloMinFinal > sueloMaxFinal) {
+        mensaje.innerText = "❌ Humedad min no puede ser mayor que humedad max.";
+        return;
+      }
+
+      if (Object.keys(actualizaciones).length === 0) {
+        mensaje.innerText = "⚠️ No ingresaste ningún valor para actualizar.";
+        mensaje.style.color = "orange";
+        return;
+      }
+
+      // Guardar los cambios
+      db.ref("valores_ideales").update(actualizaciones)
+        .then(() => {
+          mensaje.innerText = "✅ Rangos actualizados correctamente.";
+          mensaje.style.color = "green";
+          setTimeout(() => mensaje.innerText = "", 3000);
+        })
+        .catch(() => {
+          mensaje.innerText = "❌ Error al guardar los datos.";
+        });
+
+    })
+    .catch(() => {
+      mensaje.innerText = "❌ Error al obtener datos actuales.";
+    });
+}
+
+    const chartTemp = new Chart(document.getElementById('chartTemp'), {
+      type: 'line', data: { labels: [], datasets: [{ label: '🌡️ Temperatura (°C)', data: [], borderColor: '#e17055', fill: false }] }, options: { responsive: true }
+    });
+    const chartHumedad = new Chart(document.getElementById('chartHumedad'), {
+      type: 'line', data: { labels: [], datasets: [
+        { label: '💧 Humedad Aire (%)', data: [], borderColor: '#0984e3', fill: false },
+        { label: '🌾 Humedad Suelo (%)', data: [], borderColor: '#00b894', fill: false }
+      ] }, options: { responsive: true }
+    });
+    const chartOtros = new Chart(document.getElementById('chartOtros'), {
+      type: 'line', data: { labels: [], datasets: [
+        { label: '💨 CO₂ (ppm)', data: [], borderColor: '#6c5ce7', fill: false },
+        { label: '☀️ Luz (lux)', data: [], borderColor: '#fdcb6e', fill: false },
+        { label: '💧 Presión (hPa)', data: [], borderColor: '#00cec9', fill: false }
+      ] }, options: { responsive: true }
+    });
+
+    db.ref("historial").limitToLast(20).on("value", snap => {
+      const data = snap.val();
+      const labels = [], temp = [], hAire = [], hSuelo = [], co2 = [], luz = [], presion = [], rows = [];
+      for (const t in data) {
+        labels.push(t.slice(11));
+        temp.push(data[t].temperatura ?? null);
+        hAire.push(data[t].humedad_aire ?? null);
+        hSuelo.push(data[t].humedad_suelo ?? null);
+        co2.push(data[t].co2 ?? null);
+        luz.push(data[t].luz ?? null);
+        presion.push(data[t].presion ?? null);
+        rows.push(`<tr><td>${t}</td><td>${data[t].temperatura ?? '--'}</td><td>${data[t].humedad_aire ?? '--'}</td><td>${data[t].humedad_suelo ?? '--'}</td><td>${data[t].co2 ?? '--'}</td><td>${data[t].luz ?? '--'}</td><td>${data[t].presion ?? '--'}</td></tr>`);
+      }
+      chartTemp.data.labels = labels;
+      chartTemp.data.datasets[0].data = temp;
+      chartTemp.update();
+      chartHumedad.data.labels = labels;
+      chartHumedad.data.datasets[0].data = hAire;
+      chartHumedad.data.datasets[1].data = hSuelo;
+      chartHumedad.update();
+      chartOtros.data.labels = labels;
+      chartOtros.data.datasets[0].data = co2;
+      chartOtros.data.datasets[1].data = luz;
+      chartOtros.data.datasets[2].data = presion;
+      chartOtros.update();
+      document.getElementById("tablaHistorial").innerHTML = rows.reverse().join('');
+    });
+    db.ref("controles").on("value", snap => {
+  const controles = snap.val();
+  const bombaActiva = controles?.bomba_manual ?? false;
+  const ventiladorActivo = controles?.ventilador_manual ?? false;
+
+  document.getElementById("estadoBomba").innerText = bombaActiva ? "🟢 Activa" : "🔴 Inactiva";
+  document.getElementById("estadoVentilador").innerText = ventiladorActivo ? "🟢 Activo" : "🔴 Inactivo";
+});
+  </script>
+  <script>
+    const btns = {
+      bombaOn: document.getElementById("btnBombaOn"),
+      bombaOff: document.getElementById("btnBombaOff"),
+      ventOn: document.getElementById("btnVentiladorOn"),
+      ventOff: document.getElementById("btnVentiladorOff")
+    };
+  
+    function actualizarBotonesControles(data) {
+      const bomba = data.bomba_manual;
+      const ventilador = data.ventilador_manual;
+      const modoAuto = data.modo_automatico;
+  
+      // Cambiar color bomba
+      btns.bombaOn.style.backgroundColor = bomba ? "green" : "";
+      btns.bombaOff.style.backgroundColor = bomba === false ? "red" : "";
+  
+      // Cambiar color ventilador
+      btns.ventOn.style.backgroundColor = ventilador ? "green" : "";
+      btns.ventOff.style.backgroundColor = ventilador === false ? "red" : "";
+  
+      // Desactivar botones si está en modo automático
+      const disabled = modoAuto === true;
+      btns.bombaOn.disabled = disabled;
+      btns.bombaOff.disabled = disabled;
+      btns.ventOn.disabled = disabled;
+      btns.ventOff.disabled = disabled;
+    }
+  
+    db.ref("controles").on("value", snap => {
+      const controles = snap.val();
+      actualizarBotonesControles(controles);
+    });
+  </script>
+</body>
+</html>
